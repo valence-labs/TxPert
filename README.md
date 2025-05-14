@@ -107,3 +107,9 @@ python main.py --config-name=config-baseline model.model_type=experimental_basel
 ```
 
 This will estimate the perturbation-wise mean across samples from a random subsample (here using 50% of the samples per perturbation).
+
+## Changelog
+- May 2025: initial release
+
+## License
+This work is licensed under [Recursion Non-Commercial End User License Agreement](./license.pdf)
