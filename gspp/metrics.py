@@ -19,20 +19,21 @@ import gspp.constants as cs
 CELL_TYPE_MEAN_CONTROL: Dict[str, np.ndarray] = {}
 PERT_MEANS: Dict[str, pd.DataFrame] = {}
 
+
 # TODO, the gloabl mean should be phased-out, but before doing so having 1:1 numbers
 # from control matched vs global control is interesting; hence leaving for the moment
 def compute_mean_control(adata, cell_type: str):
     """calculates and caches the mean control for each batch
-    
+
     Args:
-        adata: anndata.AnnData with obs values of 'condition' where 'ctrl' marks controls, 
+        adata: anndata.AnnData with obs values of 'condition' where 'ctrl' marks controls,
             'batch' for experimental batches, and 'cell_line' for the biological context (cell type, line, etc..)
         cell_type: string by which to subset biological context
-        
-    Mutates: 
-        CELL_TYPE_MEAN_CONTROL: Dict[str, pd.core.frame.DataFrame)] 
+
+    Mutates:
+        CELL_TYPE_MEAN_CONTROL: Dict[str, pd.core.frame.DataFrame)]
             {cell_type: df of control means, batch X gene}
-    
+
     Returns:
         None
     """
@@ -45,11 +46,11 @@ def compute_mean_control(adata, cell_type: str):
             tmpx = tmpx.toarray()
         tmpx = pd.DataFrame(tmpx)
         ctrls = tmpx.mean(0)
-        
-        tmpx['group'] = temp_adata.obs.loc[ctrl_mask, cs.BATCH].values.astype(str)
+
+        tmpx["group"] = temp_adata.obs.loc[ctrl_mask, cs.BATCH].values.astype(str)
         # take the control mean for each batch
-        batch_ctrls = tmpx.groupby('group').apply(lambda x: x.iloc[:, :-1].mean(0))
-        
+        batch_ctrls = tmpx.groupby("group").apply(lambda x: x.iloc[:, :-1].mean(0))
+
         CELL_TYPE_MEAN_CONTROL[cell_type] = (ctrls, batch_ctrls)
 
 
@@ -57,7 +58,7 @@ def cache_perturbation_means(adata, cell_type):
     """setup df with index pert and mean expression for each pert
     pert names are in 'pert_raw' format, e.g. gene symbols and do not contail +ctrl, such that they can be easily
     matched to pert passed to metric functions
-    
+
     Args:
         adata: anndata object, with obs columns 'condition' marking unique perturbations, 'control' (mask) and 'cell_type'
         cell_type: cell type to use from adata
@@ -65,13 +66,16 @@ def cache_perturbation_means(adata, cell_type):
 
     if cell_type not in PERT_MEANS:
         temp_adata = adata[adata.obs[cs.CELL_TYPE] == cell_type].copy()
-        temp_adata.obs['pert_raw'] = ["+".join([p for p in perts.split("+") if p != "ctrl"]) for perts in temp_adata.obs.condition]
+        temp_adata.obs["pert_raw"] = [
+            "+".join([p for p in perts.split("+") if p != "ctrl"])
+            for perts in temp_adata.obs.condition
+        ]
         # work on a non-sparse copy of X
         newx = temp_adata.X.copy()
         if isinstance(newx, scipy.sparse._csr.csr_matrix):
             newx = newx.toarray()
         # we want the perturbation deltas vs the closest control, so we will center on batches (i.e. subtract mean)
-        control_mask = temp_adata.obs[cs.CONTROL].astype(bool).values 
+        control_mask = temp_adata.obs[cs.CONTROL].astype(bool).values
         for batch in temp_adata.obs[cs.BATCH].unique():
             batch_mask = temp_adata.obs[cs.BATCH] == batch
             # mean center in place
@@ -81,8 +85,10 @@ def cache_perturbation_means(adata, cell_type):
 
         # mean aggregate the perturbation deltas
         temp_adata = temp_adata[~control_mask]
-        means_x = sc.get.aggregate(temp_adata, by='pert_raw', axis=0, func=['mean'])
-        PERT_MEANS[cell_type] = pd.DataFrame(means_x.layers['mean'], index=means_x.obs['pert_raw'])
+        means_x = sc.get.aggregate(temp_adata, by="pert_raw", axis=0, func=["mean"])
+        PERT_MEANS[cell_type] = pd.DataFrame(
+            means_x.layers["mean"], index=means_x.obs["pert_raw"]
+        )
 
 
 def cache_de_idx(adata):
@@ -107,14 +113,15 @@ METRIC_REGISTRY: Dict[
     str, Callable[[np.ndarray, np.ndarray, str, np.ndarray], float]
 ] = {}
 
-TRAINING_METRIC_LIST: List[str] = (
-    []
-)
+TRAINING_METRIC_LIST: List[str] = []
 TESTING_METRIC_LIST: List[str] = []
 
 SLOW_METRIC_LIST: List[str] = []
 
-def register_metric(name: str, training: bool = False, testing: bool = False, slow: bool = True):
+
+def register_metric(
+    name: str, training: bool = False, testing: bool = False, slow: bool = True
+):
     """Decorator to register a metric function in the METRIC_REGISTRY."""
 
     def decorator(
@@ -160,7 +167,9 @@ def pearson_sample(
     pert: str,
     dose: str = "1+1",
 ) -> float:
-    p = np.mean([pearsonr(pred[idx, :], truth[idx, :])[0] for idx in range(pred.shape[0])])
+    p = np.mean(
+        [pearsonr(pred[idx, :], truth[idx, :])[0] for idx in range(pred.shape[0])]
+    )
     if np.isnan(p):
         return 0
     return p
@@ -226,6 +235,7 @@ def pearson_delta(
         val = 0
     return val
 
+
 @register_metric("spearman_delta", training=False, slow=True)
 def spearman_delta(
     pred: np.ndarray,
@@ -252,7 +262,12 @@ def pearson_delta_sample(
     pert: str,
     dose: str = "1+1",
 ) -> float:
-    val = np.mean([pearsonr((pred[idx, :] - ctrl[idx, :]), (truth[idx, :] - ctrl[idx, :]))[0] for idx in range(pred.shape[0])])
+    val = np.mean(
+        [
+            pearsonr((pred[idx, :] - ctrl[idx, :]), (truth[idx, :] - ctrl[idx, :]))[0]
+            for idx in range(pred.shape[0])
+        ]
+    )
     if np.isnan(val):
         val = 0
     return val
@@ -268,7 +283,7 @@ def r2_delta(
     pert: str,
     dose: str = "1+1",
 ) -> float:
-    val =  r2_score((truth - ctrl).mean(0), (pred - ctrl).mean(0))
+    val = r2_score((truth - ctrl).mean(0), (pred - ctrl).mean(0))
     if np.isnan(val):
         val = 0
     return val
@@ -284,7 +299,12 @@ def r2_delta_sample(
     pert: str,
     dose: str = "1+1",
 ) -> float:
-    val = np.mean([r2_score(truth[idx, :] - ctrl[idx, :], pred[idx, :] - ctrl[idx, :]) for idx in range(pred.shape[0])])
+    val = np.mean(
+        [
+            r2_score(truth[idx, :] - ctrl[idx, :], pred[idx, :] - ctrl[idx, :])
+            for idx in range(pred.shape[0])
+        ]
+    )
     if np.isnan(val):
         val = 0
     return val
@@ -311,7 +331,7 @@ class BreakdownAssayedMetric:
 
         if mask is None:
             return np.nan
-        
+
         subpred = pred[:, mask]
         subtruth = truth[:, mask]
         subctrl = ctrl[:, mask]
@@ -363,9 +383,10 @@ de_breakdowns = {
 for key, val in de_breakdowns.items():
     register_metric(key, slow=True)(val)
 
+
 class RetrievalMetric:
     def __init__(self, subset=False, *args, **kwargs):
-        self.subset = subset 
+        self.subset = subset
 
     def __call__(
         self,
@@ -379,13 +400,15 @@ class RetrievalMetric:
     ) -> float:
         """relative retrieval rank of true reference match for pert, to pred of pert, higher is better, uses pearson_delta"""
         pert = "+".join([p for p in pert.split("+") if p != "ctrl"])
-        
+
         truth_deltas = PERT_MEANS[cell_type]
         if self.subset:
             state = np.random.get_state()
             np.random.seed(0)
             n = min(truth_deltas.shape[0], 100)
-            samp = np.random.choice(list(range(len(truth_deltas.index))), n, replace=False)
+            samp = np.random.choice(
+                list(range(len(truth_deltas.index))), n, replace=False
+            )
             np.random.set_state(state)
             truth_index = truth_deltas.index[samp].tolist()
             if pert not in truth_index:
@@ -396,14 +419,16 @@ class RetrievalMetric:
         assert pert in truth_deltas.index
         # calculate similarity of pred to everything in truth_means
         for item in truth_deltas.index:
-            sims.append((pearsonr((pred - ctrl).mean(0), truth_deltas.loc[item])[0], item))
+            sims.append(
+                (pearsonr((pred - ctrl).mean(0), truth_deltas.loc[item])[0], item)
+            )
 
         sims = sorted(sims)  # sort by similarity
         rank = [sim[1] for sim in sims].index(pert)  # find rank of query pert
         return rank / len(sims)
 
 
-register_metric('normed_retrieval', slow=True)(RetrievalMetric(subset=False))
+register_metric("normed_retrieval", slow=True)(RetrievalMetric(subset=False))
 
 register_metric("fast_retrieval", testing=True)(RetrievalMetric(subset=True))
 
@@ -456,15 +481,16 @@ def metrics_calculation(
         for cell_type in np.unique(results[cs.RES_CELL_TYPE])
     }
 
-
     for metric_name in metrics_list:
         if metric_name not in METRIC_REGISTRY:
             raise ValueError(f"Metric '{metric_name}' is not registered.")
         metric_fn = METRIC_REGISTRY[metric_name]
-        print(f'running {metric_name}')
+        print(f"running {metric_name}")
         for pert in tqdm(np.unique(results[cs.RES_PERT_CAT])):
             for dose in np.unique(results[cs.RES_DOSE_CAT]):
-                p_d_mask = np.logical_and(results[cs.RES_PERT_CAT] == pert, results[cs.RES_DOSE_CAT] == dose)
+                p_d_mask = np.logical_and(
+                    results[cs.RES_PERT_CAT] == pert, results[cs.RES_DOSE_CAT] == dose
+                )
 
                 if np.sum(p_d_mask) == 0:
                     continue
@@ -482,12 +508,22 @@ def metrics_calculation(
                     compute_mean_control(adata, cell_type)
                     cache_perturbation_means(adata, cell_type)
                     if match_cntr:
-                        control = CELL_TYPE_MEAN_CONTROL[cell_type][1].loc[results[cs.RES_EXP_BATCH][p_d_ct_mask].astype(str), :].to_numpy()
+                        control = (
+                            CELL_TYPE_MEAN_CONTROL[cell_type][1]
+                            .loc[results[cs.RES_EXP_BATCH][p_d_ct_mask].astype(str), :]
+                            .to_numpy()
+                        )
                     else:
-                        control = CELL_TYPE_MEAN_CONTROL[cell_type][0].to_numpy().reshape(1, -1)
-                    
-                    assert control.shape[0] > 0, f"No control found for {cell_type} x {pert} x {dose}"
-                    
+                        control = (
+                            CELL_TYPE_MEAN_CONTROL[cell_type][0]
+                            .to_numpy()
+                            .reshape(1, -1)
+                        )
+
+                    assert (
+                        control.shape[0] > 0
+                    ), f"No control found for {cell_type} x {pert} x {dose}"
+
                     # Calculate primary metric
                     value = metric_fn(
                         results[cs.RES_PRED][p_d_ct_mask],
@@ -560,5 +596,7 @@ def compute_metrics(results, adata, metric_stage, match_cntr: bool = True):
 
     metrics_list = list(set(metrics_list))
 
-    metrics, metrics_pert = metrics_calculation(results, metrics_list, adata, match_cntr)
+    metrics, metrics_pert = metrics_calculation(
+        results, metrics_list, adata, match_cntr
+    )
     return metrics, metrics_pert

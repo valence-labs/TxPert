@@ -103,7 +103,7 @@ class PertPredictor(LightningModule):
     def forward(self, cntr, pert_idxs, p_emb):
         cntr = cntr.to(self.device)
         p_emb = p_emb.to(self.device)
-        
+
         return self.model.forward(cntr, pert_idxs, p_emb)
 
     def loss(self, prediction, intrinsic_mean, intrinsic_log_var, target):
@@ -184,9 +184,7 @@ class PertPredictor(LightningModule):
         test_adata = self.trainer.datamodule.adata
 
         if "baseline" in self.model_type:
-            results = self.model.apply_baseline(
-                self.trainer.datamodule.test_data
-            )
+            results = self.model.apply_baseline(self.trainer.datamodule.test_data)
         else:
             results = evaluate(
                 loader,
@@ -196,7 +194,9 @@ class PertPredictor(LightningModule):
                 self.trainer.datamodule.id2pert,
             )
 
-        metrics, test_pert_res = compute_metrics(results, test_adata, metric_stage, match_cntr=self.match_cntr_for_eval)
+        metrics, test_pert_res = compute_metrics(
+            results, test_adata, metric_stage, match_cntr=self.match_cntr_for_eval
+        )
 
         log_metrics(
             metrics, test_pert_res, stage, self.trainer.datamodule.subgroup, self
@@ -228,21 +228,44 @@ class PertPredictor(LightningModule):
     def configure_optimizers(self):
         params_to_optimize = filter(lambda p: p.requires_grad, self.parameters())
 
-        optimizer = torch.optim.AdamW(params_to_optimize, lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.AdamW(
+            params_to_optimize, lr=self.lr, weight_decay=self.weight_decay
+        )
 
         schedulers = []
         milestones = []
 
         warmup_epochs = self.lr_scheduler_args.get("warmup_epochs", 0)
         if warmup_epochs > 0:
-            schedulers.append(cs.SCHEDULER_DICT["linear"](optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs))
+            schedulers.append(
+                cs.SCHEDULER_DICT["linear"](
+                    optimizer,
+                    start_factor=0.1,
+                    end_factor=1.0,
+                    total_iters=warmup_epochs,
+                )
+            )
             milestones.append(warmup_epochs)
-        
+
         scheduler_type = self.lr_scheduler_args.get("type", None)
         if scheduler_type is not None:
             total_epochs = self.lr_scheduler_args["total_epochs"]
-            schedulers.append(cs.SCHEDULER_DICT[scheduler_type](optimizer, T_max=total_epochs - warmup_epochs, eta_min=self.min_lr))
+            schedulers.append(
+                cs.SCHEDULER_DICT[scheduler_type](
+                    optimizer, T_max=total_epochs - warmup_epochs, eta_min=self.min_lr
+                )
+            )
 
-        scheduler = cs.SCHEDULER_DICT["sequential"](optimizer, schedulers, milestones=milestones) if len(schedulers) > 0 else None
+        scheduler = (
+            cs.SCHEDULER_DICT["sequential"](
+                optimizer, schedulers, milestones=milestones
+            )
+            if len(schedulers) > 0
+            else None
+        )
 
-        return optimizer if scheduler is None else {"optimizer": optimizer, "lr_scheduler": scheduler}
+        return (
+            optimizer
+            if scheduler is None
+            else {"optimizer": optimizer, "lr_scheduler": scheduler}
+        )

@@ -54,7 +54,7 @@ class TxPert(nn.Module):
         no_pert_model: bool = False,
         pert_input_dim: int = None,
         device: str = "cpu",
-        mse_weight: float = 1.0, 
+        mse_weight: float = 1.0,
     ):
         super(TxPert, self).__init__()
         """
@@ -94,15 +94,15 @@ class TxPert(nn.Module):
             self.cntr_model = None
         else:
             self.cntr_model_type = cntr_model_args.pop("model_type", "vae")
-            
-            if self.cntr_model_type not in ['moe', 'moa']:
+
+            if self.cntr_model_type not in ["moe", "moa"]:
                 cntr_model_args.pop("rank", None)
-                
+
             self.cntr_model = BASAL_STATE_MODEL_DICT[self.cntr_model_type](
-                    input_dim=input_dim,
-                    latent_dim=latent_dim,
-                    **cntr_model_args,
-                ).to(device)
+                input_dim=input_dim,
+                latent_dim=latent_dim,
+                **cntr_model_args,
+            ).to(device)
 
         # Perturbation model
         self.pert_model_type = pert_model_args.pop("model_type", "gnn")
@@ -145,17 +145,23 @@ class TxPert(nn.Module):
             self.graphs = []
             for g in graph.graph_dict.values():
                 edge_index, edge_weight, num_nodes = g
-                self.graphs.append((
-                    torch.Tensor(edge_index).to(device),
-                    torch.Tensor(edge_weight).to(device),
-                    num_nodes
-                ))            
+                self.graphs.append(
+                    (
+                        torch.Tensor(edge_index).to(device),
+                        torch.Tensor(edge_weight).to(device),
+                        num_nodes,
+                    )
+                )
             num_layers = len(self.graphs)
-            self.p = [[j for j in range(num_layers) if j != i] for i in range(num_layers)]
+            self.p = [
+                [j for j in range(num_layers) if j != i] for i in range(num_layers)
+            ]
             # Create supra-adjacency matrix for GNN
-            supra_edge_index, supra_edge_weight, total_nodes = self.create_supra_adj(self.graphs)
+            supra_edge_index, supra_edge_weight, total_nodes = self.create_supra_adj(
+                self.graphs
+            )
             self.g_supra = (supra_edge_index, supra_edge_weight, total_nodes)
-        
+
         else:
             edge_index, edge_weight, _ = next(iter(graph.graph_dict.values()))
             self.edge_index = torch.Tensor(edge_index).to(device)
@@ -170,10 +176,12 @@ class TxPert(nn.Module):
         if self.no_basal_model:
             if self.no_pert_model:
                 return cntr, None, None
-            
-            z_intrinsic, intrinsic_mean, intrinsic_log_var = 0., None, None
+
+            z_intrinsic, intrinsic_mean, intrinsic_log_var = 0.0, None, None
         else:
-            z_intrinsic, intrinsic_mean, intrinsic_log_var = self.cntr_model.forward(cntr)
+            z_intrinsic, intrinsic_mean, intrinsic_log_var = self.cntr_model.forward(
+                cntr
+            )
 
         if self.no_pert_model:
             # Decoder
@@ -182,7 +190,7 @@ class TxPert(nn.Module):
             )
 
             if self.no_basal_model:
-                prediction = cntr[:, :self.output_dim] + prediction
+                prediction = cntr[:, : self.output_dim] + prediction
 
             return prediction, intrinsic_mean, intrinsic_log_var
 
@@ -190,14 +198,14 @@ class TxPert(nn.Module):
             # Perturbation model
             if self.pert_model_type == "multilayer":
                 z_p = self.pert_model.forward(
-                    graphs=self.graphs,
-                    p=self.p,
-                    g_supra=self.g_supra
+                    graphs=self.graphs, p=self.p, g_supra=self.g_supra
                 )
             elif self.pert_model_type == "exphormer":
                 z_p = self.pert_model.forward()
             else:
-                z_p = self.pert_model.forward(self.edge_index, self.edge_weight, z_intrinsic)
+                z_p = self.pert_model.forward(
+                    self.edge_index, self.edge_weight, z_intrinsic
+                )
 
             self.pert_z = torch.zeros(batch_size, z_p.size(-1), device=self.device)
 
@@ -217,7 +225,7 @@ class TxPert(nn.Module):
         )
 
         if self.no_basal_model:
-            prediction = cntr[:, :self.output_dim] + prediction
+            prediction = cntr[:, : self.output_dim] + prediction
 
         return prediction, intrinsic_mean, intrinsic_log_var
 
@@ -236,7 +244,11 @@ class TxPert(nn.Module):
         if self.no_basal_model:
             kl_div_intrinsic = 0.0
         else:
-            kl_div_intrinsic = self.kl_divergence(intrinsic_mean, intrinsic_log_var) if self.cntr_model_type == "vae" else 0.0
+            kl_div_intrinsic = (
+                self.kl_divergence(intrinsic_mean, intrinsic_log_var)
+                if self.cntr_model_type == "vae"
+                else 0.0
+            )
 
         logs = {
             "recon_loss": recon_loss,
@@ -259,43 +271,45 @@ class TxPert(nn.Module):
         Computes the KL divergence between the learned latent distribution (computed by the basal state model) and the standard normal distribution.
         """
         return -0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp())
-    
+
     def create_supra_adj(self, graphs):
         """
         Create supra-adjacency matrix for multilayer GNN.
-        """        
+        """
         device = graphs[0][0].device
         nodes_per_layer = [g[2] for g in graphs]
         total_nodes = sum(nodes_per_layer)
-        
+
         edges_list = []
         weights_list = []
         offset = 0
-        
+
         for i, (edge_index, edge_weight, num_nodes) in enumerate(graphs):
             # Check edge index bounds before offset
             max_idx = edge_index.max().item()
             if max_idx >= num_nodes:
-                raise ValueError(f"Layer {i}: Edge index {max_idx} exceeds number of nodes {num_nodes}")
-            
+                raise ValueError(
+                    f"Layer {i}: Edge index {max_idx} exceeds number of nodes {num_nodes}"
+                )
+
             # Create new edge index with offset
             new_edge_index = edge_index.clone()
             new_edge_index += offset
-            
+
             # Validate after offset
             new_max_idx = new_edge_index.max().item()
             if new_max_idx >= total_nodes:
                 raise ValueError(
                     f"Layer {i}: Offset edge index {new_max_idx} exceeds total nodes {total_nodes}"
                 )
-            
+
             edges_list.append(new_edge_index)
             weights_list.append(edge_weight)
-            
+
             offset += num_nodes
-        
+
         # Combine edges and weights
         supra_edge_index = torch.cat(edges_list, dim=1)
         supra_edge_weight = torch.cat(weights_list)
-        
+
         return supra_edge_index, supra_edge_weight, total_nodes

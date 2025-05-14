@@ -25,7 +25,9 @@ from gspp.utils import download_files_from_zenodo
 @hydra.main(config_name="config-gat", config_path="configs", version_base="1.3")
 def main(cfg: DictConfig):
     OmegaConf.set_struct(cfg, False)
-    download_files_from_zenodo("15393145", "KcPONWTmFPfYGH2vSI8SLqeND0tu8GCRDh2cgXldyAk6GJsWvVkMBkA04JTN")
+    download_files_from_zenodo(
+        "15393145", "KcPONWTmFPfYGH2vSI8SLqeND0tu8GCRDh2cgXldyAk6GJsWvVkMBkA04JTN"
+    )
     try:
         t0 = time()
         infer(cfg)

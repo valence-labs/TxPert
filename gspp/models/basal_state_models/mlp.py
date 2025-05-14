@@ -45,11 +45,8 @@ class BasalMLP(nn.Module):
 
         self.intrinsic_mean_layer = nn.Linear(hidden_dim, latent_dim)
 
-
     def forward(self, x):
         x = self.encoder_z(x)
         intrinsic_mean = self.intrinsic_mean_layer(x)
 
         return intrinsic_mean, 0, 0
-
-

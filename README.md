@@ -38,8 +38,8 @@ uv pip install -e .
 Data should be automatically downloaded when running the code. The appropriate data will be downloaded to the `cache` folder in the current working directory. 
 
 ## Data Description
-### Single-Cell Line Cache
-The single-cell line adata cache is derived from the raw K562 essential gene perturbation dataset provided by Replogle et al. (2022). To ensure comparability with prior work, we follow the same preprocessing pipeline used in GEARS (Roohani et al., 2024) and CausalBench (Chevalley et al., 2022). This preprocessing includes:
+### Single Cell Line Cache
+The single cell line adata cache is derived from the raw K562 essential gene perturbation dataset provided by Replogle et al. (2022). To ensure comparability with prior work, we follow the same preprocessing pipeline used in GEARS (Roohani et al., 2024) and CausalBench (Chevalley et al., 2022). This preprocessing includes:
 - Filtering to retain strong perturbation signals.
 
 - Library size normalization (fixed to 4000 counts).
@@ -50,8 +50,8 @@ The single-cell line adata cache is derived from the raw K562 essential gene per
 
 The code for this process is provided by the GEARS authors and is available in this [notebook](https://github.com/yhr91/GEARS_misc/blob/main/data/preprocessing/Replogle_2022_preprocess.ipynb). Additional discussion can be found in this [Github issue](https://github.com/snap-stanford/GEARS/issues/28).
 
-### Cross-Cell Line Cache
-The cross-cell line adata cache includes perturbation data from four different cell lines:
+### Cross Cell Line Cache
+The cross cell line adata cache includes perturbation data from four different cell lines:
 
 - K562 and RPE1 from [Replogle et al. (2022)](https://pubmed.ncbi.nlm.nih.gov/35688146/)
 
@@ -80,7 +80,7 @@ We provide datasets and code here to reproduce the experiments shown in the pape
 
 We focus on the **K562 cell type** here as well as models that **only rely on public data sources** for training.
 
-### TxPert inference with a checkpoint
+### TxPert Inference with a Checkpoint
 To run inference for prediction of perturbation effects on unseen perturbations with one of our pretrained models, use
 ```
 python main.py --config-name=config-[model_type] 
@@ -92,7 +92,7 @@ To run the same experiment for transfer to an unseen cell type, use
 python main.py --config-name=config-x-cell-gat
 ```
 
-### General baseline
+### General Baseline
 We provide a "general" baseline that combines the mean control expression in the test cell-type with the mean perturbation-specific delta observed across training cell-types. If the perturbation is not in the training set, the global delta is used instead. To apply this baseline for the prediction of unseen perturbation effects, run the following command:
 ```
 python main.py --config-name=config-baseline
@@ -100,7 +100,7 @@ python main.py --config-name=config-baseline
 
 For the prediction of perturbation effects in unseen cell types, use the option `--config-name=config-x-cell-baseline` instead.
 
-### Experimental reproducibility
+### Experimental Reproducibility
 A second baseline characterizing the experimental reproducibility of the experiment is available using the following command:
 ```
 python main.py --config-name=config-baseline model.model_type=experimental_baseline +model.test_seen=0.5

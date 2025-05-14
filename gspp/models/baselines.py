@@ -67,11 +67,11 @@ class MeanBaseline(PertBaseline):
         """
         return {
             "pert2id": datamodule.pert2id,
-            "test_cell_type": datamodule.test_cell_type, 
+            "test_cell_type": datamodule.test_cell_type,
             "train_cell_types": datamodule.train_cell_types,
             "train_ds": datamodule.train_data,
             "test_ds": datamodule.test_data,
-            "output_dim": datamodule.output_dim
+            "output_dim": datamodule.output_dim,
         }
 
     def prepare_baseline(
@@ -99,25 +99,42 @@ class MeanBaseline(PertBaseline):
         self.pert2id = pert2id
         self.output_dim = output_dim
 
-        test_perts = [[p for p in perts if p != -1] for perts in test_ds.pert_conditions]
+        test_perts = [
+            [p for p in perts if p != -1] for perts in test_ds.pert_conditions
+        ]
         test_perts = [tuple(p) for p in test_perts if p != ["ctrl"]]
 
         unique_test_perts = list(set(test_perts))
 
-        train_perts = [[p for p in perts if p != -1] for perts in train_ds.pert_conditions]
+        train_perts = [
+            [p for p in perts if p != -1] for perts in train_ds.pert_conditions
+        ]
 
-        single_pert_indices = [idx for idx, perts in enumerate(train_perts) if len(perts) == 1 and perts != ["ctrl"]]
-        double_pert_indices = [idx for idx, perts in enumerate(train_perts) if len(perts) == 2]
+        single_pert_indices = [
+            idx
+            for idx, perts in enumerate(train_perts)
+            if len(perts) == 1 and perts != ["ctrl"]
+        ]
+        double_pert_indices = [
+            idx for idx, perts in enumerate(train_perts) if len(perts) == 2
+        ]
 
         train_perts = [tuple(p) for p in train_perts if p != ["ctrl"]]
 
         unique_train_perts = list(set(train_perts))
 
-        seen_perts =  [p for p in unique_train_perts if p in unique_test_perts or (len(p) == 1 and any([p[0] in pert for pert in unique_test_perts]))]
+        seen_perts = [
+            p
+            for p in unique_train_perts
+            if p in unique_test_perts
+            or (len(p) == 1 and any([p[0] in pert for pert in unique_test_perts]))
+        ]
 
         # Compute mean control of the test cell-types
         self.test_cntr_mean = {
-            ct: test_ds.control_data[test_ds.control_cell_types == ct][:, :self.output_dim].mean(0)
+            ct: test_ds.control_data[test_ds.control_cell_types == ct][
+                :, : self.output_dim
+            ].mean(0)
             for ct in test_ds.control_cell_types.unique()
         }
 
@@ -126,17 +143,19 @@ class MeanBaseline(PertBaseline):
         self.delta_dict = {cell_type: {} for cell_type in train_cell_types}
 
         # This is the training data (notably also containing controls that we need to filter out)
-        train_perturbed = train_ds.pert_data[:, :self.output_dim]
+        train_perturbed = train_ds.pert_data[:, : self.output_dim]
 
         cntr_mean_dict = {}
         for ct in train_cell_types:
             cntr_mean_dict[ct] = {}
 
             for b in train_ds.control_ct_batch_indices[ct].keys():
-                cntr_mean_dict[ct][b] = train_ds.control_data[train_ds.control_ct_batch_indices[ct][b],:].mean(0)
+                cntr_mean_dict[ct][b] = train_ds.control_data[
+                    train_ds.control_ct_batch_indices[ct][b], :
+                ].mean(0)
 
         deltas = []
-        
+
         # Derive delta for each sample in the training data
         for idx, row in enumerate(train_perturbed):
             c = train_ds.pert_conditions.iloc[idx]
@@ -148,7 +167,7 @@ class MeanBaseline(PertBaseline):
                 deltas.append(row - cntr_mean_dict[ct][b])
 
         deltas = torch.stack(deltas)
-        
+
         # Compute deltas separately for each training cell-type
         for ct in train_cell_types:
             logger.info(f"Computing heuristic for {ct}")
@@ -162,18 +181,26 @@ class MeanBaseline(PertBaseline):
 
             for order in ["single", "double"]:
                 # intersection
-                ct_order_indices = np.intersect1d(ct_indices, single_pert_indices if order == "single" else double_pert_indices)
+                ct_order_indices = np.intersect1d(
+                    ct_indices,
+                    single_pert_indices if order == "single" else double_pert_indices,
+                )
 
                 # Compute global deltas
                 self.global_delta[ct][order] = (
-                    deltas[ct_order_indices].mean(0), len(ct_order_indices)
+                    deltas[ct_order_indices].mean(0),
+                    len(ct_order_indices),
                 )
 
             # Now computing the same per perturbation (if seen in training)
             for p in tqdm(seen_perts):
                 if len(p) == 1:
                     pert_indices = np.where(
-                        [tuple([p[0], -1]) == tuple(el) or tuple([-1, p[0]]) == tuple(el) for el in train_ds.pert_conditions]
+                        [
+                            tuple([p[0], -1]) == tuple(el)
+                            or tuple([-1, p[0]]) == tuple(el)
+                            for el in train_ds.pert_conditions
+                        ]
                     )[0]
                 elif len(p) == 2:
                     pert_indices = np.where(
@@ -194,7 +221,8 @@ class MeanBaseline(PertBaseline):
 
                 # Compute mean perturbation delta
                 self.delta_dict[ct][p] = (
-                    deltas[intersection_p].mean(0), p_sample_count
+                    deltas[intersection_p].mean(0),
+                    p_sample_count,
                 )
 
     def apply_baseline(self, test_ds: XcelltypePerturbDataset):
@@ -230,9 +258,16 @@ class MeanBaseline(PertBaseline):
             individual_deltas = {}
 
             # First, check if pert is a double that has been observed
-            if len(pert_indices) == 2 and any(
-                [tuple(pert_indices) in val.keys() for val in self.delta_dict.values()]
-            ) and not self.global_mean:
+            if (
+                len(pert_indices) == 2
+                and any(
+                    [
+                        tuple(pert_indices) in val.keys()
+                        for val in self.delta_dict.values()
+                    ]
+                )
+                and not self.global_mean
+            ):
                 # We combine the knowledge from all training cell-types that are available (will be averaged out in the end)
                 for val in self.delta_dict.values():
                     if tuple(pert_indices) in val.keys():
@@ -249,39 +284,53 @@ class MeanBaseline(PertBaseline):
                 for sub_idx, p_idx in enumerate(pert_indices):
                     individual_deltas[sub_idx] = []
                     # Use pert-specific delta if available in at least one training cell-type, otherwise revert to global delta
-                    if any(
-                        [tuple([p_idx]) in val.keys() for val in self.delta_dict.values()]
-                    ) and not self.global_mean:
+                    if (
+                        any(
+                            [
+                                tuple([p_idx]) in val.keys()
+                                for val in self.delta_dict.values()
+                            ]
+                        )
+                        and not self.global_mean
+                    ):
                         # We combine the knowledge from all training cell-types that are available (will be averaged out in the end)
                         for val in self.delta_dict.values():
                             if tuple([p_idx]) in val.keys():
                                 individual_deltas[sub_idx].append(val[tuple([p_idx])])
-                    
+
                     else:
                         # We combine the knowledge from all training cell-types that are available (will be averaged out in the end)
                         for val in self.global_delta.values():
                             individual_deltas[sub_idx].append(val["single"])
 
-            assert len(double_deltas) > 0 or any([len(deltas) > 0 for deltas in individual_deltas.values()])
+            assert len(double_deltas) > 0 or any(
+                [len(deltas) > 0 for deltas in individual_deltas.values()]
+            )
 
             # Adding perturbation effect to mean control; averaging out the deltas weighted by sample count per cell-type
             y = test_ds._get_control_data(idx)
 
             # Use double delta if available
             if len(double_deltas) > 0:
-                y += sum([d[0] * d[1] for d in double_deltas]) / max(sum([d[1] for d in double_deltas]), 1)
+                y += sum([d[0] * d[1] for d in double_deltas]) / max(
+                    sum([d[1] for d in double_deltas]), 1
+                )
 
             # Otherwise use individual deltas (starting with first part of pert)
             if 0 in individual_deltas.keys():
-                y += sum([d[0] * d[1] for d in individual_deltas[0]]) / max(sum([d[1] for d in individual_deltas[0]]), 1)
-            
+                y += sum([d[0] * d[1] for d in individual_deltas[0]]) / max(
+                    sum([d[1] for d in individual_deltas[0]]), 1
+                )
+
             # If applicable, use second part of pert
             if 1 in individual_deltas.keys():
-                y += sum([d[0] * d[1] for d in individual_deltas[1]]) / max(sum([d[1] for d in individual_deltas[1]]), 1)
+                y += sum([d[0] * d[1] for d in individual_deltas[1]]) / max(
+                    sum([d[1] for d in individual_deltas[1]]), 1
+                )
 
             preds.append(y)
 
-            truths.append(test_ds.pert_data[idx, :self.output_dim])
+            truths.append(test_ds.pert_data[idx, : self.output_dim])
 
         results = {}
         results["pert_cat"] = np.array(pert_cats)
@@ -326,7 +375,7 @@ class ExperimentalAccuracy(PertBaseline):
             "test_cell_type": datamodule.test_cell_type,
             "train_cell_types": datamodule.train_cell_types,
             "test_ds": datamodule.test_data,
-            "output_dim": datamodule.output_dim
+            "output_dim": datamodule.output_dim,
         }
 
     def prepare_baseline(
@@ -346,30 +395,40 @@ class ExperimentalAccuracy(PertBaseline):
             output_dim (int): The output dimension of the model
         """
         logger.info("Preparing baseline")
-        
+
         self.output_dim = output_dim
 
         # Determine set of test cell-type x perturbations combinations in test set
-        test_perts = [[p for p in perts if p != -1] for perts in test_ds.pert_conditions]
+        test_perts = [
+            [p for p in perts if p != -1] for perts in test_ds.pert_conditions
+        ]
         test_perts = [tuple(p) for p in test_perts]
-    
+
         unique_test_perts = list(set(test_perts))
         unique_test_batches = list(set(test_ds.treatment_cell_batches))
 
-        test_pert_list = [tuple([p for p in perts if p != -1]) for perts in test_ds.pert_conditions]
+        test_pert_list = [
+            tuple([p for p in perts if p != -1]) for perts in test_ds.pert_conditions
+        ]
 
         self.pert2samples = {p: {} for p in unique_test_perts}
 
         # For each unique perturbation...
         for p in tqdm(unique_test_perts):
             # Find indices/rows associated to this perturbation in the test data
-            p_indices = [idx for idx, el in enumerate(test_pert_list) if tuple(el) == tuple(p)]
-            
+            p_indices = [
+                idx for idx, el in enumerate(test_pert_list) if tuple(el) == tuple(p)
+            ]
+
             for b in unique_test_batches:
-                b_indices = [idx for idx, el in enumerate(test_ds.treatment_cell_batches) if el == b]
+                b_indices = [
+                    idx
+                    for idx, el in enumerate(test_ds.treatment_cell_batches)
+                    if el == b
+                ]
 
                 combined_indices = np.intersect1d(p_indices, b_indices).tolist()
-                
+
                 if len(combined_indices) == 0:
                     continue
 
@@ -406,7 +465,7 @@ class ExperimentalAccuracy(PertBaseline):
         batch_cats = []
 
         all_seen = {p: [] for p in self.pert2samples.keys()}
-        
+
         for p, batch_indices in self.pert2samples.items():
             for indices in batch_indices.values():
                 all_seen[p].extend(indices)
@@ -418,7 +477,10 @@ class ExperimentalAccuracy(PertBaseline):
             b = test_ds.treatment_cell_batches.iloc[idx]
 
             # Get the subsampled indices associated to the present perturbation; match on batch if enough samples available and not aggregating across batches
-            if not self.aggregate_batches and b in self.pert2samples[tuple(perts)].keys():
+            if (
+                not self.aggregate_batches
+                and b in self.pert2samples[tuple(perts)].keys()
+            ):
                 sample_indices = self.pert2samples[tuple(perts)][b]
             else:
                 # Aggregate across batches if not enough samples available
@@ -430,16 +492,14 @@ class ExperimentalAccuracy(PertBaseline):
 
             dose_cats.append(dose)
             batch_cats.append(b)
-            
+
             cell_types.append(test_cell_type)
             pert_cats.append(perts_raw)
 
             # Compute the mean of the subsampled data
-            preds.append(
-                test_ds.pert_data[sample_indices, :self.output_dim].mean(0)
-            )
+            preds.append(test_ds.pert_data[sample_indices, : self.output_dim].mean(0))
 
-            truths.append(test_ds.pert_data[idx, :self.output_dim])
+            truths.append(test_ds.pert_data[idx, : self.output_dim])
 
         results = {}
         results["pert_cat"] = np.array(pert_cats)

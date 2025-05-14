@@ -107,7 +107,9 @@ class HybridWrapper(nn.Module):
                 in_dim += out_dim
 
             self.mlp_out = MLP(
-                [in_dim] + (depth_mlp - 1) * [hidden_dim] + [out_dim], activation=activation, norm=None
+                [in_dim] + (depth_mlp - 1) * [hidden_dim] + [out_dim],
+                activation=activation,
+                norm=None,
             )
         else:
             self.mlp_out = None

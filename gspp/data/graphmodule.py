@@ -61,11 +61,15 @@ class GSPGraph:
 
             # Rewire graph if parameter is set
             if p_rewire_src > 0.0 or p_rewire_tgt > 0.0:
-                print('Rewiring graph with p_rewires:', (p_rewire_src, p_rewire_tgt))
-                graph = self.random_rewire(graph, p_rewire_src=p_rewire_src, p_rewire_tgt=p_rewire_tgt, random_seed=random_seed)
+                print("Rewiring graph with p_rewires:", (p_rewire_src, p_rewire_tgt))
+                graph = self.random_rewire(
+                    graph,
+                    p_rewire_src=p_rewire_src,
+                    p_rewire_tgt=p_rewire_tgt,
+                    random_seed=random_seed,
+                )
 
             self.graph_dict[graph_name] = graph
-
 
     def create_graph(self, graph_type: str, graph_args: Dict[str, Any] = None):
         """
@@ -193,7 +197,6 @@ class GSPGraph:
 
         return edge_index, edge_weight, num_nodes
 
-
     def downsample_graph(
         self,
         graph: Tuple[torch.Tensor, torch.Tensor],
@@ -225,7 +228,6 @@ class GSPGraph:
         edge_weight = edge_weight[:n_downsample]
 
         return edge_index, edge_weight, num_nodes
-    
 
     def random_rewire(
         self,

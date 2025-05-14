@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from timm.layers import trunc_normal_
 
+
 class MixtureLinear(nn.Module):
     """
     Mixture of linear layers.
     """
+
     def __init__(
         self,
         in_features: int,
@@ -55,7 +57,9 @@ class MixtureLinear(nn.Module):
             # x: (B, in_features) -> unsqueeze to (B, 1, in_features)
             # combined_weight.transpose: (B, in_features, out_features)
             # bmm yields (B, 1, out_features) then squeeze to (B, out_features)
-            output = torch.bmm(input.unsqueeze(1), combined_weight.transpose(1, 2)).squeeze(1)
+            output = torch.bmm(
+                input.unsqueeze(1), combined_weight.transpose(1, 2)
+            ).squeeze(1)
             if combined_bias is not None:
                 output = output + combined_bias
             return output
@@ -68,7 +72,6 @@ class MixtureLinear(nn.Module):
             else:
                 combined_bias = None
             return F.linear(input, combined_weight, combined_bias)
-    
 
     def extra_repr(self) -> str:
         return (
@@ -80,12 +83,12 @@ class MixtureLinear(nn.Module):
 class MoA(nn.Module):
     """
     Mixture of MLP experts with input-dependent coefficients.
-    
+
     Instead of a single global coefficient vector (as in MoE),
     this class uses a learnable matrix of shape (input_dim, rank). Given an input
     of shape (B, input_dim), multiplying by this matrix produces a coefficient tensor of shape (B, rank)
     so that every sample has its own set of coefficients.
-    
+
     Args:
         input_dim (int): Dimension of the input data.
         hidden_dim (int): Dimension of the hidden layer.
@@ -95,27 +98,32 @@ class MoA(nn.Module):
         use_layer_norm (bool): Whether to apply layer normalization.
         rank (int): Number of experts (rank dimension).
     """
-    def __init__(self,
-                 input_dim: int,
-                 hidden_dim: int = 512,
-                 latent_dim: int = 64,
-                 dropout: float = 0.2,
-                 use_batch_norm: bool = True,
-                 use_layer_norm: bool = False,
-                 decode_latent: bool = False,
-                 rank: int = 16):
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 512,
+        latent_dim: int = 64,
+        dropout: float = 0.2,
+        use_batch_norm: bool = True,
+        use_layer_norm: bool = False,
+        decode_latent: bool = False,
+        rank: int = 16,
+    ):
         super(MoA, self).__init__()
         self.rank = rank
 
         self.fc1 = MixtureLinear(input_dim, hidden_dim, rank=rank, bias=True)
-        self.norm = (nn.BatchNorm1d(hidden_dim) if use_batch_norm
-                     else nn.LayerNorm(hidden_dim) if use_layer_norm
-                     else nn.Identity())
+        self.norm = (
+            nn.BatchNorm1d(hidden_dim)
+            if use_batch_norm
+            else nn.LayerNorm(hidden_dim) if use_layer_norm else nn.Identity()
+        )
         self.act = nn.LeakyReLU()
         self.drop1 = nn.Dropout(dropout)
         self.fc2 = MixtureLinear(hidden_dim, latent_dim, rank=rank, bias=True)
         self.drop2 = nn.Dropout(dropout)
-        
+
         # Learnable coefficient matrix: maps input (of size input_dim) to coefficients (of size rank)
         # Shape: (input_dim, rank)
         self.coef_mat = nn.Parameter(torch.empty(input_dim, rank))
@@ -137,7 +145,7 @@ class MoA(nn.Module):
         coef = x @ self.coef_mat
         # (Optionally, you might normalize these coefficients, e.g., with softmax)
         coef = F.softmax(coef, dim=-1)
-        
+
         # Pass the input along with its per-sample coefficients through the network.
         x = self.fc1(x, coef)
         x = self.norm(x)
@@ -145,19 +153,8 @@ class MoA(nn.Module):
         x = self.drop1(x)
         x = self.fc2(x, coef)
         x = self.drop2(x)
-        
+
         return x, 0, 0
-
-
-
-
-
-
-
-
-
-
-
 
 
 class MoE(nn.Module):
@@ -174,6 +171,7 @@ class MoE(nn.Module):
         use_batch_norm (bool): Whether to apply batch normalization.
         use_layer_norm (bool): Whether to apply layer normalization.
     """
+
     def __init__(
         self,
         input_dim: int,
@@ -189,8 +187,10 @@ class MoE(nn.Module):
         self.rank = rank
 
         self.fc1 = MixtureLinear(input_dim, hidden_dim, rank=rank, bias=True)
-        self.norm = nn.BatchNorm1d(hidden_dim) if use_batch_norm else (
-            nn.LayerNorm(hidden_dim) if use_layer_norm else nn.Identity()
+        self.norm = (
+            nn.BatchNorm1d(hidden_dim)
+            if use_batch_norm
+            else (nn.LayerNorm(hidden_dim) if use_layer_norm else nn.Identity())
         )
         self.act = nn.LeakyReLU()
         self.drop1 = nn.Dropout(dropout)
@@ -207,7 +207,9 @@ class MoE(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: shape (batch, input_dim)
-        coef_soft = F.softmax(self.coef, dim=0).unsqueeze(0) #self.coef.unsqueeze(0) #F.softmax(self.coef, dim=0).unsqueeze(0)
+        coef_soft = F.softmax(self.coef, dim=0).unsqueeze(
+            0
+        )  # self.coef.unsqueeze(0) #F.softmax(self.coef, dim=0).unsqueeze(0)
         x = self.fc1(x, coef_soft)  # Removed unsqueeze
         x = self.norm(x)
         x = self.act(x)
@@ -215,6 +217,7 @@ class MoE(nn.Module):
         x = self.fc2(x, coef_soft)  # Removed unsqueeze here as well
         x = self.drop2(x)
         return x, 0, 0
+
 
 if __name__ == "__main__":
     # Define input dimensions

@@ -28,6 +28,7 @@ class Payload:
     """
     Dataclass for collate function
     """
+
     x: torch.Tensor
     control: torch.Tensor
     p: torch.Tensor
@@ -49,7 +50,17 @@ def collate_fn(batch) -> Payload:
     Returns:
         Payload: Collated data
     """
-    x, control, p, pert_idxs, pert_cond_names, pert_dose, idx, cell_types, experimental_batches = zip(*batch)
+    (
+        x,
+        control,
+        p,
+        pert_idxs,
+        pert_cond_names,
+        pert_dose,
+        idx,
+        cell_types,
+        experimental_batches,
+    ) = zip(*batch)
     return Payload(
         x=torch.stack(x),
         control=torch.stack(control),
@@ -222,7 +233,9 @@ def _rank_genes_groups_by_cov(
         adata_cov = adata[adata.obs[covariate] == cov_cat]
 
         min_samples = 2
-        valid_groups = adata_cov.obs[groupby].value_counts()[lambda x: x >= min_samples].index
+        valid_groups = (
+            adata_cov.obs[groupby].value_counts()[lambda x: x >= min_samples].index
+        )
         adata_cov = adata_cov[adata_cov.obs[groupby].isin(valid_groups)]
 
         # compute DEGs

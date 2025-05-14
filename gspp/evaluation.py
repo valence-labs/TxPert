@@ -25,8 +25,11 @@ def evaluate(loader, model, device, adata, id2pert):
     # UBL5+ctrl        0       25    K562      1+1            K562_UBL5+ctrl_1+1
     # so the following makes a mapping from e.g. 'K562_UBL5+ctrl_1+1' to 'UBL5+ctrl' style naming
     for condition_name in np.unique(adata.obs[["condition_name"]]):
-        pert_name_cache[condition_name] = (condition_name.split("_")[1], condition_name.split("_")[-1])
-    
+        pert_name_cache[condition_name] = (
+            condition_name.split("_")[1],
+            condition_name.split("_")[-1],
+        )
+
     for batch in loader:
         with torch.no_grad():
             if model.no_pert:
