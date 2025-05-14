@@ -26,7 +26,7 @@ module load CUDA/12.4.0
 ```
 Install the project (this step will install all the dependencies)
 ```sh
-# Assuming you are in the GSP folder
+# Assuming you are in the TxPert folder
 uv pip install -e .
 ```
 **Note:** The default `uv` cache dir is pointing to user's local home directory, which causes uv to fail hard-linking files (as partitions differ when using compute nodes). For enhanced performance, you can set the `UV_CACHE_DIR` variable to point to current folder (in the shell or in the slurm script). In interactive sessions, it would be something like:
@@ -34,11 +34,11 @@ uv pip install -e .
  export UV_CACHE_DIR=<PROJECT-DIRT>/.cache
 ```
 
-## Download data
+## Data Download
 Data should be automatically downloaded when running the code. The appropriate data will be downloaded to the `cache` folder in the current working directory. 
 
-## Descriptions of data
-### Single-Cell Line Adata Cache
+## Data Description
+### Single-Cell Line Cache
 The single-cell line adata cache is derived from the raw K562 essential gene perturbation dataset provided by Replogle et al. (2022). To ensure comparability with prior work, we follow the same preprocessing pipeline used in GEARS (Roohani et al., 2024) and CausalBench (Chevalley et al., 2022). This preprocessing includes:
 - Filtering to retain strong perturbation signals.
 
@@ -50,12 +50,14 @@ The single-cell line adata cache is derived from the raw K562 essential gene per
 
 The code for this process is provided by the GEARS authors and is available in this [notebook](https://github.com/yhr91/GEARS_misc/blob/main/data/preprocessing/Replogle_2022_preprocess.ipynb). Additional discussion can be found in this [Github issue](https://github.com/snap-stanford/GEARS/issues/28).
 
-### Cross-Cell Line Adata Cache
+### Cross-Cell Line Cache
 The cross-cell line adata cache includes perturbation data from four different cell lines:
 
-- K562 and RPE1 from Replogle et al. (2022)
+- K562 and RPE1 from [Replogle et al. (2022)](https://pubmed.ncbi.nlm.nih.gov/35688146/)
 
-- Jurkat and HepG2 from Nadig et al. (2024)
+- Jurkat and HepG2 from [Nadig et al. (2025)](https://www.nature.com/articles/s41588-025-02169-3)
+
+- K562_adamson from [Adamson et al. (2016)](https://pubmed.ncbi.nlm.nih.gov/27984733/)
 
 Each cell line is initially processed independently using the same procedure as for the single-cell line cache, except that highly variable gene (HVG) selection is deferred. After individual processing, the datasets are concatenated, and HVGs are selected based on the intersection of:
 
@@ -83,7 +85,7 @@ To run inference for prediction of perturbation effects on unseen perturbations 
 ```
 python main.py --config-name=config-[model_type] 
 ```
-Available models (`model_type`) are `gat`, `exphormer` and `exphormer-mg`.
+Available models (`model_type`) are `gat`, `exphormer` and `exphormer-mg`. Note that we provide only a subset of models reported in the paper as most of our best models rely on proprietary knowledge graphs (KGs). In particular, the `exphormer-mg` reported here uses two KGs (STRINGdb and GO) as an example of multi-graph (MG) reasoning. However, the model reported in the paper uses two additional proprietary KGs and achieves higher performance.
 
 To run the same experiment for transfer to an unseen cell type, use
 ```
