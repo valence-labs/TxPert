@@ -10,8 +10,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### Clone the repo
 ```sh
-git clone https://github.com/recursionpharma/GSP.git -b release
-cd GSP
+git clone git@github.com:valence-labs/TxPert.git
+cd TxPert
 ```
 ### Create and activate a Python 3.12 environment:
 ```sh
