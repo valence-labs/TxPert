@@ -1,0 +1,19 @@
+model:
+  model_type: mean_baseline
+
+datamodule:
+  task_type: K562_cross_cell_lines
+  match_cntr: true
+  avg_cntr: true
+  batch_size: 64
+  embed_cntr: true
+  obsm_key: raw
+  
+graph:
+  graph_cfg: {}
+
+seed: 1
+match_cntr_for_eval: true
+
+mode: baseline
+checkpoint_path: null

@@ -1,0 +1,65 @@
+model:
+  model_type: txpert
+  no_basal_model: false
+  no_pert_model: false
+  hidden_dim: 512
+  latent_dim: 64
+  dropout: 0.2
+  use_batch_norm: true
+  use_layer_norm: false
+  omit_cntr: false
+  mse_weight: 1
+  slow_benchmark: false 
+  
+  cntr_model:
+    model_type: mlp
+    rank: 16
+    decode_latent: false
+    use_batch_norm: true
+    use_layer_norm: false
+
+  pert_model:
+    model_type: exphormer
+    layer_type: exphormer_w_mpnn
+    num_layers: 4
+    hidden_dim: 128
+    skip: skip_cat
+    dropout: 0.1
+    num_heads: 2
+    concat: true
+    add_self_loops: true
+    expander_degree: 3
+    add_reverse_edges: true
+    use_edge_weight: false
+    use_struc_feat: false
+    pos_enc: none
+    union_edge_type: multihot
+    edge_feat_map_type: linear
+
+datamodule:
+  mode: ${mode}
+  task_type: K562_single_cell_line
+  match_cntr: true
+  avg_cntr: true
+  batch_size: 64
+  embed_cntr: true
+  obsm_key: raw
+
+graph:
+  graph_cfg:
+    graph0:
+      graph_type: string
+      reduce2perts: true
+      norm_weights: true
+      mode: top_20
+    graph1:
+      graph_type: go
+      reduce2perts: true
+      norm_weights: false
+      mode: top_20
+
+seed: 1
+match_cntr_for_eval: true
+
+mode: inference
+checkpoint_name: K562_unseen_pert_exphormer_mg.ckpt
