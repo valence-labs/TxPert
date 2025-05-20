@@ -19,7 +19,7 @@ def set_seed(seed) -> None:
     torch.backends.cudnn.benchmark = False
 
 
-def download_files_from_zenodo(record_id: int, ACCESS_TOKENS: str | None) -> None:
+def download_files_from_zenodo(record_id: int, ACCESS_TOKENS: str | None = None)  -> None:
     import requests
     import zipfile
     from tqdm import tqdm

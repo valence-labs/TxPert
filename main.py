@@ -26,7 +26,7 @@ from gspp.utils import download_files_from_zenodo
 def main(cfg: DictConfig):
     OmegaConf.set_struct(cfg, False)
     download_files_from_zenodo(
-        "15393145", "KcPONWTmFPfYGH2vSI8SLqeND0tu8GCRDh2cgXldyAk6GJsWvVkMBkA04JTN"
+        "15420279"
     )
     try:
         t0 = time()
