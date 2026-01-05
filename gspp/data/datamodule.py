@@ -34,8 +34,11 @@ class PertDataModule(L.LightningDataModule):
         avg_cntr (bool): Whether to average the control rather than random sampling
         embed_cntr (bool): Whether to embed control samples
         obsm_key (str): Key for the embedding in adata.obsm
-        task_type (str): Pre-defined demo task type for the datamodule
+        task_type (str): Task type identifier (used for cache path). If custom cell types are provided, can be any string.
         mode (str): Mode for the datamodule, either "baseline" or "inference"
+        train_cell_types (Union[str, List[str], None]): Custom train cell types. If None, uses task_type lookup.
+        val_cell_type (str, None): Custom validation cell type.
+        test_cell_type (str, None): Custom test cell type. If None, uses task_type lookup.
     """
 
     def __init__(
@@ -47,6 +50,10 @@ class PertDataModule(L.LightningDataModule):
         obsm_key: str = cs.ObsmKey.SCGPT,
         task_type: str = "K562_single_cell_line",
         mode: str = "baseline",
+        train_cell_types: Union[str, list, None] = None,
+        val_cell_type: Union[str, None] = None,
+        test_cell_type: Union[str, None] = None,
+        suppress_cell_type_validation: bool = False,
     ):
         """
         Initialize the PertDataModule with various parameters.
@@ -66,10 +73,25 @@ class PertDataModule(L.LightningDataModule):
         self._initialize_gene_sets()
 
         self.task_type = task_type
-        self._validate_task_type()
-        self.train_cell_types, self.val_cell_type, self.test_cell_type = (
-            cs.DEMO_DATASET_CELL_TYPES[self.task_type]
-        )
+        
+        # Use custom cell types if provided, otherwise look up from DEMO_DATASET_CELL_TYPES
+        if train_cell_types is None and val_cell_type is None and test_cell_type is None:
+            # Use predefined task type
+            self._validate_task_type()
+            self.train_cell_types, self.val_cell_type, self.test_cell_type = (
+                cs.DEMO_DATASET_CELL_TYPES[self.task_type]
+            )
+        else:
+            # Custom cell types provided - use them directly
+            if train_cell_types is None or test_cell_type is None:
+                raise ValueError(
+                    "If providing custom cell types, both (train_cell_types, test_cell_type) must be specified"
+                )
+            self.train_cell_types = train_cell_types
+            self.val_cell_type = val_cell_type
+            self.test_cell_type = test_cell_type
+        
+        self.suppress_cell_type_validation = suppress_cell_type_validation
         self._validate_and_set_cell_types()
         self.cache_path = self.cache_dir / self.task_type
 
@@ -89,16 +111,17 @@ class PertDataModule(L.LightningDataModule):
         Validate and set the provided cell types against the public cell types.
         """
         if self.test_cell_type not in cs.PUBLIC_CELL_TYPES:
-            raise ValueError(
-                f"test_cell_type must be one of {cs.PUBLIC_CELL_TYPES}, got {self.test_cell_type}"
-            )
+            if self.suppress_cell_type_validation:
+                raise ValueError(
+                    f"test_cell_type must be one of {cs.PUBLIC_CELL_TYPES}, got {self.test_cell_type}"
+                )
 
         if isinstance(self.train_cell_types, str) and self.train_cell_types != "all":
             self.train_cell_types = [self.train_cell_types]
 
         if not (
             self.train_cell_types == "all"
-            or all(ct in cs.PUBLIC_CELL_TYPES for ct in self.train_cell_types)
+            or all(ct in cs.PUBLIC_CELL_TYPES for ct in self.train_cell_types) or self.suppress_cell_type_validation 
         ):
             raise ValueError(
                 f"train_cell_types must be 'all' or a subset of {cs.PUBLIC_CELL_TYPES}, got {self.train_cell_types}"
@@ -108,6 +131,9 @@ class PertDataModule(L.LightningDataModule):
         temp_train_cell_types.remove(self.test_cell_type)
         if self.val_cell_type is not None:
             temp_train_cell_types.remove(self.val_cell_type)
+
+        if self.suppress_cell_type_validation and self.train_cell_types == "all":
+            raise ValueError("cannot use 'all' shortcut for training cell types without validation, they must be listed individually")
 
         self.train_cell_types = (
             [
@@ -320,11 +346,6 @@ class PertDataModule(L.LightningDataModule):
         Load predefined splits for the data.
         """
         print(f"Loading predefined splits from {self.cache_path}")
-        if not os.path.exists(
-            self.cache_path / f"splits/train_test_split.pkl"
-        ) or not os.path.exists(self.cache_path / f"splits/subgroup.pkl"):
-            print(self.cache_path / f"splits/train_test_split.pkl")
-            raise ValueError("Predefined splits not found")
         self.condition_group = joblib.load(
             self.cache_path / f"splits/train_test_split.pkl"
         )
