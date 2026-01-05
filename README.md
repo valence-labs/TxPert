@@ -48,7 +48,17 @@ The single cell line adata cache is derived from the raw K562 essential gene per
 
 - Highly variable gene selection (top 5000 genes).
 
-The code for this process is provided by the GEARS authors and is available in this [notebook](https://github.com/yhr91/GEARS_misc/blob/main/data/preprocessing/Replogle_2022_preprocess.ipynb). Additional discussion can be found in this [Github issue](https://github.com/snap-stanford/GEARS/issues/28).
+The data processing was for consistently and comparability, tightly based on 
+that provided by the GEARS authors in this [notebook](https://github.com/yhr91/GEARS_misc/blob/main/data/preprocessing/Replogle_2022_preprocess.ipynb). Additional discussion can be found in this [Github issue](https://github.com/snap-stanford/GEARS/issues/28).
+
+For convenience, there is also a repository-internal onboarding example under [data/onboard_dataset.ipynb].
+
+To utilize newly onboarded data, a few parameters must be set (in config or as command line arguments), namely
+- `datamodule.task_type` name of folder under `./cache` where the new data and task-defining splits were saved
+- `datamodule.train_cell_types` str of cell line/type, or list 
+- `datamodule.test_cell_type` str with cell line/type
+- (if adding data with a cell line not in 'K562', 'RPE1', 'hepg2', 'jurkat') `datamodule.suppress_cell_type_validation=true`
+
 
 ### Cross Cell Line Cache
 The cross cell line adata cache includes perturbation data from four different cell lines:
@@ -92,6 +102,13 @@ To run the same experiment for transfer to an unseen cell type, use
 python main.py --config-name=config-x-cell-gat
 ```
 
+All provided configs are found in the folder `configs/`, and can be updated or added to
+as desired for new defaults or common usage patterns.
+
+Parameters can also be set on the command line. E.g. `python main.py --config-name=config-gat datamodule.batch_size=32` will run slower, but use less gpu memory. 
+
+Parameters from configs or commandline are handled via [hydra](https://hydra.cc/docs/intro/).
+
 ### General Baseline
 We provide a "general" baseline that combines the mean control expression in the test cell-type with the mean perturbation-specific delta observed across training cell-types. If the perturbation is not in the training set, the global delta is used instead. To apply this baseline for the prediction of unseen perturbation effects, run the following command:
 ```
@@ -107,6 +124,8 @@ python main.py --config-name=config-baseline model.model_type=experimental_basel
 ```
 
 This will estimate the perturbation-wise mean across samples from a random subsample (here using 50% of the samples per perturbation).
+
+
 
 ## Changelog
 - May 2025: initial release
