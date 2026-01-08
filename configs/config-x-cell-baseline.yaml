@@ -21,3 +21,4 @@ match_cntr_for_eval: true
 
 mode: baseline
 checkpoint_path: null
+save_dir: ./cache/predictions/x-cell-baseline

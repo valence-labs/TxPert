@@ -558,6 +558,16 @@ class PertDataModule(L.LightningDataModule):
             collate_fn=collate_fn,
         )
 
+    def predict_dataloader(self) -> DataLoader:
+        """
+        Return the DataLoader for prediction data (same as test). 
+        """
+        return DataLoader(
+            self.test_data,
+            batch_size=self.batch_size,
+            collate_fn=collate_fn,
+        )
+
     def get_all_dataloaders(self) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """
         Return all DataLoaders (train, validation, test).

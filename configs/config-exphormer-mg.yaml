@@ -67,3 +67,4 @@ match_cntr_for_eval: true
 
 mode: inference
 checkpoint_name: K562_unseen_pert_exphormer_mg.ckpt
+save_dir: ./cache/predictions/K562_unseen_pert_exphormer_mg

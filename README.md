@@ -109,6 +109,33 @@ Parameters can also be set on the command line. E.g. `python main.py --config-na
 
 Parameters from configs or commandline are handled via [hydra](https://hydra.cc/docs/intro/).
 
+### TxPert Predictions with a Checkpoint
+As TxPert Inference with a Checkpoint, except that it saves the predictions to disk, instead
+of evaluating them.
+
+Call with e.g.  
+```
+python main.py --config-name=gat mode=predict
+```
+The location of the results can be configured with the `save_dir` parameter 
+(default in the cache/prediction folder, with a subfolder of a name matching the task_type).
+
+This saves the data both in a format near to how the model processes is it, i.e. as the pickle file test_results.pkl with a dictionary including the following keys
+- 'pert_idxs': perturbation indices in graph
+- 'base_state': normalized control expression
+- 'output': predicted normalized perturbed expression
+- 'ground_truth': ground truth normalized perturbed expresion
+- 'pert_cond_names': string indicating the full cell type and perturbation to condition on, e.g. 'K562_SMG5+ctrl_1+1'
+- 'cell_types': cell type or line as appropriate
+- 'experimental_batches': batch id (e.g. gem group, plate, etc)
+
+For convenience and familiarity, it also saves anndata files for predictions, controls, and ground state.
+Note that these generally don't match observation ordering in the input file (it's a subsetset of the total, test only); hence exporting all three for comparability. 
+
+These files include the 'pert_cond_names', 'cell_types', and 'experimental_batches'
+from above, and additionally have a boolean 'control' column to distinguish control from
+non control cells as in the input. 
+
 ### General Baseline
 We provide a "general" baseline that combines the mean control expression in the test cell-type with the mean perturbation-specific delta observed across training cell-types. If the perturbation is not in the training set, the global delta is used instead. To apply this baseline for the prediction of unseen perturbation effects, run the following command:
 ```

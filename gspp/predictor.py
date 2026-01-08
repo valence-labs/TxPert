@@ -3,6 +3,8 @@ from typing import Any, Dict
 import torch
 
 import numpy as np
+import scanpy as sc
+import pandas as pd
 
 from lightning import LightningModule
 from torch.utils.data import DataLoader
@@ -14,6 +16,11 @@ from gspp.evaluation import evaluate
 from gspp.metrics import log_metrics, compute_metrics
 
 import gspp.constants as cs
+
+import os
+import pickle
+from loguru import logger
+
 
 MODEL_DICT = {
     "txpert": TxPert,
@@ -269,3 +276,112 @@ class PertPredictor(LightningModule):
             if scheduler is None
             else {"optimizer": optimizer, "lr_scheduler": scheduler}
         )
+
+    def predict_step(self, batch, batch_idx):
+        """
+        Perform prediction on a batch and return all relevant data for saving.
+        """
+        with torch.no_grad():
+            # Get predictions
+            if self.no_pert:
+                predictions = batch.control[:, : self.adata_output_dim]
+            else:
+                predictions = self.sample_inference(
+                    batch.control, batch.pert_idxs, batch.p, batch.cell_types
+                )
+
+            # Return dictionary with all data needed for saving
+            return {
+                'base_states': batch.control.cpu(),
+                'outputs': predictions.cpu(),
+                'perturbations': batch.p.cpu(),
+                'ground_truths': batch.x[:, : self.adata_output_dim].cpu(),
+                'pert_idxs': batch.pert_idxs,
+                'pert_cond_names': batch.pert_cond_names,
+                'cell_types': batch.cell_types,
+                'experimental_batches': batch.experimental_batches,
+            }
+
+    def on_predict_epoch_end(self):
+        """
+        Collect all predictions and save them to files.
+        """
+        if not hasattr(self, '_predict_save_dir') or not hasattr(self, '_predict_split_name'):
+            return
+
+        save_dir = self._predict_save_dir
+        split_name = self._predict_split_name
+
+        # Get predictions from trainer's predict loop
+        results = self.trainer.predict_loop.predictions
+
+        # Collect all predictions from all batches
+        #all_perturbations = []
+        all_base_states = []
+        all_outputs = []
+        all_pert_idxs = []
+        all_pert_cond_names = []
+        all_cell_types = []
+        all_experimental_batches = []
+        all_ground_truths = []
+
+        for batch_results in results:
+            all_base_states.append(batch_results['base_states'])
+            all_outputs.append(batch_results['outputs'])
+            #all_perturbations.append(batch_results['perturbations'])
+            all_ground_truths.append(batch_results['ground_truths'])
+            all_pert_idxs.extend(batch_results['pert_idxs'])
+            all_pert_cond_names.extend(batch_results['pert_cond_names'])
+            all_cell_types.extend(batch_results['cell_types'])
+            all_experimental_batches.extend(batch_results['experimental_batches'])
+
+        # Concatenate tensors
+        base_states = torch.cat(all_base_states).numpy()
+        outputs = torch.cat(all_outputs).numpy()
+        #perturbations = torch.cat(all_perturbations).numpy()
+        ground_truths = torch.cat(all_ground_truths).numpy()
+
+        # Prepare data dictionary
+        results_data = {
+            #'input_perturbation': perturbations,
+            'base_state': base_states,
+            'output': outputs,
+            'ground_truth': ground_truths,
+            'pert_idxs': all_pert_idxs,
+            'pert_cond_names': all_pert_cond_names,
+            'cell_types': all_cell_types,
+            'experimental_batches': all_experimental_batches,
+        }
+
+        # Create save directory if it doesn't exist
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Save as pickle file
+        save_path = os.path.join(save_dir, f"{split_name}_results.pkl")
+        with open(save_path, 'wb') as f:
+            pickle.dump(results_data, f)
+
+        # Save as anndata objects
+        obs = pd.DataFrame({
+            "pert_cond_names": all_pert_cond_names,
+            "cell_types": all_cell_types,
+            "experimental_batches": all_experimental_batches,
+            "control": False
+        })
+
+        # var from original anndata - use stored reference if datamodule not available
+        adata = self.trainer.datamodule.adata
+        
+        var = adata.var[:self.adata_output_dim].copy()
+        pred_adata = sc.AnnData(outputs, obs=obs, var=var, uns=adata.uns)
+        ground_truth_adata = sc.AnnData(ground_truths, obs=obs, var=var, uns=adata.uns)
+
+        pred_adata.write_h5ad(os.path.join(save_dir, f"{split_name}_predictions.h5ad"))
+        ground_truth_adata.write_h5ad(os.path.join(save_dir, f"{split_name}_ground_truth.h5ad"))
+
+        obs_ct = obs.copy()
+        obs_ct["control"] = True
+        control_adata = sc.AnnData(base_states, obs=obs_ct, var=var, uns=adata.uns)
+        control_adata.write_h5ad(os.path.join(save_dir, f"{split_name}_controls.h5ad"))
+
+        logger.info(f"Saved {split_name} results to {save_dir} ({len(all_pert_cond_names)} samples)")
