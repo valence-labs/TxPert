@@ -44,6 +44,10 @@ datamodule:
   batch_size: 64
   embed_cntr: true
   obsm_key: raw
+  train_cell_types: null
+  val_cell_type: null
+  test_cell_type: null
+  suppress_cell_type_validation: false
 
 graph:
   graph_cfg:
@@ -63,3 +67,4 @@ match_cntr_for_eval: true
 
 mode: inference
 checkpoint_name: K562_unseen_pert_exphormer_mg.ckpt
+save_dir: ./cache/predictions/K562_unseen_pert_exphormer_mg

@@ -85,11 +85,29 @@ def infer(cfg: DictConfig):
             model_args=OmegaConf.to_container(cfg.model, resolve=True),
             device=device,
         ).to(device)
+        # Testing
+        trainer.test(GSP_model, datamodule)
+    # Predictions
+    elif cfg.mode == "predict":
+        GSP_model = PertPredictor.load_from_checkpoint(
+            CHECKPOINT_DIR / cfg.checkpoint_name,
+            input_dim=datamodule.input_dim,
+            output_dim=datamodule.output_dim,
+            adata_output_dim=datamodule.adata_output_dim,
+            num_perts=len(datamodule.pert2id),
+            graph=graph,
+            pert_names=list(datamodule.pert2id.keys()),
+            model_args=OmegaConf.to_container(cfg.model, resolve=True),
+            device=device,
+        ).to(device)
+        datamodule.setup("test")
+        GSP_model._predict_save_dir = cfg.save_dir
+        GSP_model._predict_split_name = "test"
+        trainer.predict(GSP_model, datamodule)
     else:
         raise ValueError(f"Invalid mode: {cfg.mode}")
 
-    # Testing
-    trainer.test(GSP_model, datamodule)
+
 
 
 if __name__ == "__main__":

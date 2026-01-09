@@ -1,6 +1,7 @@
 import numpy as np
 import scanpy as sc
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 
 def filter_cells_by_pert_effect(
@@ -50,3 +51,28 @@ def filter_cells_by_pert_effect(
     filtered_adata = adata[subset_idxs, :].copy()
 
     return perc_underk, filtered_adata
+
+
+def define_splits_singles(conditions: list[str], 
+                          test_size: float = 0.25, 
+                          val_size: float = 0.1,
+                          random_state: int = 42) -> tuple[dict[str, list[str]], dict[str, dict[str, list[str]]]]:
+    """
+    Define train, test, val splits; and a place holder for the subgroup
+    """
+
+    train_val, test = train_test_split(sorted(conditions), test_size=test_size, random_state=random_state)
+    train, val = train_test_split(sorted(train_val), test_size=val_size / (1 - test_size), random_state=random_state)
+    train_test_val = {"train": train, "test": test, "val": val}
+
+    # use same placeholder keys as for doubles / from gears standard
+    subgroup = {"test_subgroup": {"combo_seen0": [], 
+                                  "combo_seen1": [], 
+                                  "combo_seen2": [], 
+                                  "unseen_single": test},
+                "val_subgroup": {"combo_seen0": [], 
+                                 "combo_seen1": [], 
+                                 "combo_seen2": [], 
+                                 "unseen_single": val}}
+
+    return train_test_val, subgroup
