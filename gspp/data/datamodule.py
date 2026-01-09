@@ -111,7 +111,7 @@ class PertDataModule(L.LightningDataModule):
         Validate and set the provided cell types against the public cell types.
         """
         if self.test_cell_type not in cs.PUBLIC_CELL_TYPES:
-            if self.suppress_cell_type_validation:
+            if not self.suppress_cell_type_validation:
                 raise ValueError(
                     f"test_cell_type must be one of {cs.PUBLIC_CELL_TYPES}, got {self.test_cell_type}"
                 )
